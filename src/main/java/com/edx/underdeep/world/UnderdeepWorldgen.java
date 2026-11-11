@@ -9,10 +9,15 @@ import net.minecraft.world.World;
 import net.minecraft.world.IWorld;
 import net.minecraft.world.chunk.IChunk;
 import net.minecraft.world.chunk.ChunkPos;
-import net.minecraftforge.common.extensions.IForgeChunk;
+import net.minecraftforge.event.world.ChunkDataEvent;
 import net.minecraftforge.event.world.ChunkEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
+import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
+import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Random;
 
 /**
@@ -25,22 +30,64 @@ import java.util.Random;
  */
 public final class UnderdeepWorldgen {
     private static final String PROCESSED_KEY = "underdeep_terrain_v1";
+    private static final Map<World, Set<Long>> PROCESSED_CHUNKS =
+            Collections.synchronizedMap(new WeakHashMap<World, Set<Long>>());
+
+    private static World getOverworld(IWorld candidate) {
+        if (!(candidate instanceof World)) {
+            return null;
+        }
+        World world = (World) candidate;
+        return !world.isRemote && world.dimension().equals(World.OVERWORLD) ? world : null;
+    }
+
+    private static Set<Long> processedChunks(World world) {
+        synchronized (PROCESSED_CHUNKS) {
+            Set<Long> chunks = PROCESSED_CHUNKS.get(world);
+            if (chunks == null) {
+                chunks = ConcurrentHashMap.newKeySet();
+                PROCESSED_CHUNKS.put(world, chunks);
+            }
+            return chunks;
+        }
+    }
+
+    private static long chunkKey(ChunkPos pos) {
+        return ((long) pos.x << 32) ^ (pos.z & 0xffffffffL);
+    }
+
+    @SubscribeEvent
+    public void onChunkDataLoad(ChunkDataEvent.Load event) {
+        World world = getOverworld(event.getWorld());
+        if (world == null) {
+            return;
+        }
+        if (event.getData().getBoolean(PROCESSED_KEY)) {
+            processedChunks(world).add(chunkKey(event.getChunk().getPos()));
+        }
+    }
+
+    @SubscribeEvent
+    public void onChunkDataSave(ChunkDataEvent.Save event) {
+        World world = getOverworld(event.getWorld());
+        if (world == null) {
+            return;
+        }
+        if (processedChunks(world).contains(chunkKey(event.getChunk().getPos()))) {
+            event.getData().putBoolean(PROCESSED_KEY, true);
+        }
+    }
 
     @SubscribeEvent
     public void onChunkLoad(ChunkEvent.Load event) {
-        IWorld eventWorld = event.getWorld();
-        if (eventWorld.isClientSide() || !(eventWorld instanceof World)) {
-            return;
-        }
-
-        World world = (World) eventWorld;
-        if (!world.dimension().equals(World.OVERWORLD)) {
+        World world = getOverworld(event.getWorld());
+        if (world == null) {
             return;
         }
 
         IChunk chunk = event.getChunk();
-        CompoundNBT persistent = ((IForgeChunk) chunk).getPersistentData();
-        if (persistent.getBoolean(PROCESSED_KEY)) {
+        Set<Long> processed = processedChunks(world);
+        if (!processed.add(chunkKey(chunk.getPos()))) {
             return;
         }
 
@@ -103,7 +150,5 @@ public final class UnderdeepWorldgen {
                 }
             }
         }
-
-        persistent.putBoolean(PROCESSED_KEY, true);
     }
 }

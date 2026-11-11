@@ -6,6 +6,7 @@ import net.minecraft.block.Blocks;
 import net.minecraft.nbt.CompoundNBT;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraft.world.IWorld;
 import net.minecraft.world.chunk.IChunk;
 import net.minecraft.world.chunk.ChunkPos;
 import net.minecraftforge.common.extensions.IForgeChunk;
@@ -15,19 +16,25 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import java.util.Random;
 
 /**
- * Prototype terrain pass for 1.16.1.
+ * Playable-height terrain prototype for Forge 32.0.108.
  *
- * Forge 32.0.108 does not expose negative build height, so this pass stays
- * inside the original 0..255 range. It only replaces natural stone and only
- * marks a chunk after processing, avoiding repeated changes on later loads.
+ * This deliberately stays inside the 1.16.1 build-height range. It does not
+ * create negative Y coordinates or change the engine's chunk section layout.
+ * Run it in a new test world first; unprocessed existing chunks are also
+ * eligible for the one-time terrain pass.
  */
 public final class UnderdeepWorldgen {
     private static final String PROCESSED_KEY = "underdeep_terrain_v1";
 
     @SubscribeEvent
     public void onChunkLoad(ChunkEvent.Load event) {
-        World world = event.getWorld();
-        if (world.isRemote || !world.getDimensionKey().equals(World.OVERWORLD)) {
+        IWorld eventWorld = event.getWorld();
+        if (eventWorld.isClientSide() || !(eventWorld instanceof World)) {
+            return;
+        }
+
+        World world = (World) eventWorld;
+        if (!world.dimension().equals(World.OVERWORLD)) {
             return;
         }
 
@@ -38,14 +45,14 @@ public final class UnderdeepWorldgen {
         }
 
         ChunkPos chunkPos = chunk.getPos();
-        long seed = world.getSeed()
-                ^ (long) chunkPos.x * 341873128712L
-                ^ (long) chunkPos.z * 132897987541L;
+        long seed = ((long) chunkPos.x * 341873128712L)
+                ^ ((long) chunkPos.z * 132897987541L)
+                ^ 0x5DEECE66DL;
         Random random = new Random(seed);
         int startX = chunkPos.x << 4;
         int startZ = chunkPos.z << 4;
 
-        // Build a deepslate-like band in the lower 38 blocks.
+        // Add a dark stone band in the lower 38 blocks of the old height range.
         for (int localX = 0; localX < 16; localX++) {
             for (int localZ = 0; localZ < 16; localZ++) {
                 for (int y = 1; y <= 38; y++) {
@@ -55,9 +62,7 @@ public final class UnderdeepWorldgen {
                         continue;
                     }
 
-                    if (y <= 24) {
-                        chunk.setBlockState(pos, ModBlocks.DEEPSLATE.get().getDefaultState(), false);
-                    } else if (random.nextFloat() < 0.35F) {
+                    if (y <= 24 || random.nextFloat() < 0.35F) {
                         chunk.setBlockState(pos, ModBlocks.DEEPSLATE.get().getDefaultState(), false);
                     }
 
@@ -68,7 +73,7 @@ public final class UnderdeepWorldgen {
             }
         }
 
-        // Carve one or two broad chambers into the new lower layer.
+        // Carve broad chambers through the new lower stone band.
         int chambers = 1 + random.nextInt(2);
         for (int chamber = 0; chamber < chambers; chamber++) {
             int centerX = startX + 3 + random.nextInt(10);

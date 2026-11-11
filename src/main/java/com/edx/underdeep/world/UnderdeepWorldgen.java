@@ -99,7 +99,7 @@ public final class UnderdeepWorldgen {
         ChunkPos chunkPos = chunk.getPos();
         int startX = chunkPos.x << 4;
         int startZ = chunkPos.z << 4;
-        long worldSeed = world.getSeed();
+        long worldSeed = world.getWorldInfo().getSeed();
         long chunkSeed = mix64(worldSeed
                 ^ ((long) chunkPos.x * 341873128712L)
                 ^ ((long) chunkPos.z * 132897987541L));

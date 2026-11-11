@@ -1,0 +1,13 @@
+modLoader="javafml"
+loaderVersion="[32,)"
+license="MIT"
+
+[[mods]]
+modId="underdeep"
+version="0.1.0"
+displayName="Underdeep"
+authors="207edx"
+description='''
+An experimental underground expansion for Minecraft 1.16.1.
+This prototype does not yet implement negative world Y coordinates.
+'''

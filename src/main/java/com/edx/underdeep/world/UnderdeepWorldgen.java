@@ -99,7 +99,9 @@ public final class UnderdeepWorldgen {
         ChunkPos chunkPos = chunk.getPos();
         int startX = chunkPos.x << 4;
         int startZ = chunkPos.z << 4;
-        long worldSeed = world.getWorldInfo().getSeed();
+        // MCP 20200820 does not expose a seed accessor on World/IWorldInfo.
+        // Use a fixed salt for this transitional pass; engine-native generation will use the world's seed.
+        long worldSeed = 0x4F1BBCDCBFA54001L;
         long chunkSeed = mix64(worldSeed
                 ^ ((long) chunkPos.x * 341873128712L)
                 ^ ((long) chunkPos.z * 132897987541L));

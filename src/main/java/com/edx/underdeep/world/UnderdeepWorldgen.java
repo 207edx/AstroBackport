@@ -38,7 +38,7 @@ public final class UnderdeepWorldgen {
             return null;
         }
         World world = (World) candidate;
-        return !world.isRemote && world.dimension().equals(World.OVERWORLD) ? world : null;
+        return !world.isRemote && world.getDimensionKey().equals(World.OVERWORLD) ? world : null;
     }
 
     private static Set<Long> processedChunks(World world) {
